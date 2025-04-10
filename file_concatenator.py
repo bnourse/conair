@@ -245,7 +245,13 @@ class FileConcatenator:
             # Move directories to the top
             dirs = [item for item in all_contents if os.path.isdir(os.path.join(self.current_path, item))]
             files = [item for item in all_contents if not os.path.isdir(os.path.join(self.current_path, item))]
-            sorted_contents = dirs + files
+            
+            # Add parent directory entry '..' at the very top, but not for the root directory
+            parent_dir = os.path.dirname(self.current_path)
+            if parent_dir != self.current_path:  # Check if not at root directory
+                sorted_contents = [".."] + dirs + files
+            else:
+                sorted_contents = dirs + files
             
             # Apply filter if needed
             if self.current_filter:
@@ -272,6 +278,12 @@ class FileConcatenator:
             return
         
         selected = contents[self.current_index]
+        
+        # Handle special case for parent directory navigation
+        if selected == "..":
+            self.navigate_up()
+            return
+            
         full_path = os.path.join(self.current_path, selected)
         
         if os.path.isdir(full_path):
