@@ -277,14 +277,15 @@ class FileConcatenator:
                 self.status_message = "Exited reorder mode"
             elif key == ord('r'):  # Toggle reorder mode
                 self.toggle_reorder_mode()
-            elif key == ord('u') or key == ord('k'):  # Move file up
+            elif key == ord('u'):  # Move file up in order
                 self.move_file_up()
-            elif key == ord('d') or key == ord('j'):  # Move file down
+            elif key == ord('d'):  # Move file down in order
                 self.move_file_down()
-            elif key == curses.KEY_UP:  # Up arrow
-                self.move_file_up()
-            elif key == curses.KEY_DOWN:  # Down arrow
-                self.move_file_down()
+            elif key == ord('j') or key == curses.KEY_DOWN:  # Navigate down
+                self.current_index = min(len(self.marked_files_order) - 1 if self.marked_files_order else 0, 
+                                         self.current_index + 1)
+            elif key == ord('k') or key == curses.KEY_UP:  # Navigate up
+                self.current_index = max(0, self.current_index - 1)
             elif key == ord('q'):  # Quit
                 self.quit_flag = True
             return
