@@ -10,7 +10,15 @@ import curses
 import os
 import re
 import sys
+import subprocess
 from typing import Dict, List, Set, Tuple
+
+# Check if we can use pyperclip, otherwise use platform-specific clipboard commands
+try:
+    import pyperclip
+    HAVE_PYPERCLIP = True
+except ImportError:
+    HAVE_PYPERCLIP = False
 
 class FileConcatenator:
     def __init__(self, start_path: str = os.getcwd()):
@@ -158,6 +166,8 @@ class FileConcatenator:
             "Backspace: Go up one directory",
             "m: Mark/unmark file (auto-advances to next)",
             "u: Unmark file and move up in list",
+            "y: Copy file contents to clipboard",
+            "p: Copy file path to clipboard",
             "a: Mark all text files in current directory",
             "o: Set custom output filename",
             "f: Toggle filter mode (filter by name)",
@@ -239,8 +249,10 @@ class FileConcatenator:
             self.help_visible = not self.help_visible
         elif key == ord('u'):  # Unmark and move up
             self.unmark_and_move_up()
-        elif key == ord('u'):  # Unmark and move up
-            self.unmark_and_move_up()
+        elif key == ord('y'):  # Copy file contents to clipboard (like vim's "yank")
+            self.copy_file_contents_to_clipboard()
+        elif key == ord('p'):  # Copy file path to clipboard
+            self.copy_file_path_to_clipboard()
 
     def get_filtered_directory_contents(self) -> List[str]:
         """Get directory contents with filtering applied"""
@@ -461,6 +473,61 @@ class FileConcatenator:
             self.status_message = f"Concatenated {len(self.marked_files)} files to {os.path.basename(output_file)}"
         except Exception as e:
             self.status_message = f"Error during concatenation: {str(e)}"
+
+    def copy_to_clipboard(self, text: str) -> bool:
+        """Copy text to system clipboard"""
+        if HAVE_PYPERCLIP:
+            try:
+                pyperclip.copy(text)
+                return True
+            except Exception as e:
+                self.status_message = f"Failed to copy to clipboard: {str(e)}"
+                return False
+        else:
+            # Fallback to platform-specific commands
+            try:
+                # macOS pbcopy
+                process = subprocess.Popen('pbcopy', env={'LANG': 'en_US.UTF-8'}, stdin=subprocess.PIPE)
+                process.communicate(text.encode('utf-8'))
+                return process.returncode == 0
+            except Exception as e:
+                self.status_message = f"Failed to copy to clipboard: {str(e)}"
+                return False
+
+    def copy_file_contents_to_clipboard(self):
+        """Copy the currently selected file's contents to clipboard"""
+        contents = self.get_filtered_directory_contents()
+        if not contents or self.current_index >= len(contents):
+            return
+        
+        selected = contents[self.current_index]
+        full_path = os.path.join(self.current_path, selected)
+        
+        if os.path.isdir(full_path):
+            self.status_message = "Cannot copy directory contents to clipboard"
+            return
+        
+        try:
+            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            if self.copy_to_clipboard(content):
+                self.status_message = f"Copied contents of {selected} to clipboard"
+            
+        except Exception as e:
+            self.status_message = f"Error copying file contents: {str(e)}"
+
+    def copy_file_path_to_clipboard(self):
+        """Copy the currently selected file's full path to clipboard"""
+        contents = self.get_filtered_directory_contents()
+        if not contents or self.current_index >= len(contents):
+            return
+        
+        selected = contents[self.current_index]
+        full_path = os.path.abspath(os.path.join(self.current_path, selected))
+        
+        if self.copy_to_clipboard(full_path):
+            self.status_message = f"Copied path of {selected} to clipboard"
 
     def set_output_filename(self):
         """Set a custom output filename"""
