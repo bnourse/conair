@@ -157,6 +157,7 @@ class FileConcatenator:
             "Enter: Open directory or view file",
             "Backspace: Go up one directory",
             "m: Mark/unmark file (auto-advances to next)",
+            "u: Unmark file and move up in list",
             "a: Mark all text files in current directory",
             "o: Set custom output filename",
             "f: Toggle filter mode (filter by name)",
@@ -236,6 +237,10 @@ class FileConcatenator:
             self.quit_flag = True
         elif key == ord('?'):
             self.help_visible = not self.help_visible
+        elif key == ord('u'):  # Unmark and move up
+            self.unmark_and_move_up()
+        elif key == ord('u'):  # Unmark and move up
+            self.unmark_and_move_up()
 
     def get_filtered_directory_contents(self) -> List[str]:
         """Get directory contents with filtering applied"""
@@ -369,6 +374,27 @@ class FileConcatenator:
         else:
             self.marked_files[full_path] = selected
             self.status_message = f"Marked: {selected}"
+
+    def unmark_and_move_up(self):
+        """Unmark the currently selected file and move up one item in the list"""
+        contents = self.get_filtered_directory_contents()
+        if not contents or self.current_index >= len(contents):
+            return
+        
+        selected = contents[self.current_index]
+        full_path = os.path.abspath(os.path.join(self.current_path, selected))
+        
+        # If the file is marked, unmark it
+        if full_path in self.marked_files and not os.path.isdir(full_path):
+            del self.marked_files[full_path]
+            self.status_message = f"Unmarked: {selected}"
+        
+        # Move up in the list
+        if self.current_index > 0:
+            self.current_index -= 1
+        else:
+            # Already at top, give feedback
+            self.status_message += " (Already at top of list)"
 
     def mark_all_files(self):
         """Toggle marking all text files in the current directory"""
