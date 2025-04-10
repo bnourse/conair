@@ -24,6 +24,7 @@ class FileConcatenator:
     def __init__(self, start_path: str = os.getcwd()):
         self.current_path = os.path.abspath(start_path)
         self.marked_files: Dict[str, str] = {}  # Dict of absolute paths to filenames
+        self.marked_files_order: List[str] = []  # List of absolute paths in concatenation order
         self.current_filter = ""
         self.filter_mode = False
         self.filter_by_extension = False
@@ -33,6 +34,7 @@ class FileConcatenator:
         self.help_visible = False
         self.quit_flag = False
         self.custom_output_filename = ""  # Store custom output filename
+        self.reorder_mode = False  # Flag for reorder mode
 
     def run(self, stdscr):
         """Main entry point for the curses application"""
@@ -55,72 +57,125 @@ class FileConcatenator:
         height, width = stdscr.getmaxyx()
         
         # Draw header
-        header = f" Current Dir: {self.current_path} "
+        if self.reorder_mode:
+            header = f" REORDER MODE - Concatenation Order "
+        else:
+            header = f" Current Dir: {self.current_path} "
+            
         filter_status = f" Filter: {self.current_filter}" if self.filter_mode else ""
         stdscr.addstr(0, 0, header + filter_status)
         stdscr.addstr(1, 0, "=" * (width - 1))
         
-        # Get directory contents
-        try:
-            contents = self.get_filtered_directory_contents()
-        except Exception as e:
-            self.status_message = f"Error: {str(e)}"
-            contents = []
-
-        # Adjust current_index if needed
-        if contents and self.current_index >= len(contents):
-            self.current_index = len(contents) - 1
-        
-        # Calculate visible range
-        max_items = height - 7  # Reserve lines for header, footer, status
-        if max_items < 1:
-            max_items = 1
-        
-        if self.current_index - self.scroll_offset >= max_items:
-            self.scroll_offset = self.current_index - max_items + 1
-        elif self.current_index < self.scroll_offset:
-            self.scroll_offset = self.current_index
-        
-        end_idx = min(len(contents), self.scroll_offset + max_items)
-        visible_contents = contents[self.scroll_offset:end_idx]
-        
-        # Display directory contents
-        for i, item in enumerate(visible_contents):
-            idx = i + self.scroll_offset
-            is_dir = os.path.isdir(os.path.join(self.current_path, item))
-            is_marked = os.path.abspath(os.path.join(self.current_path, item)) in self.marked_files
+        # If in reorder mode, show marked files in current order
+        if self.reorder_mode:
+            visible_contents = []
+            contents = self.marked_files_order
             
-            prefix = ""
-            if is_marked:
-                prefix = "[*] "
-            elif is_dir:
-                prefix = "[d] "
-            else:
-                prefix = "    "
+            # Adjust current_index if needed for reorder mode
+            if contents and self.current_index >= len(contents):
+                self.current_index = len(contents) - 1
             
-            attr = 0
-            if idx == self.current_index:
-                attr = curses.color_pair(3)
-            elif is_marked:
-                attr = curses.color_pair(1)
-            elif is_dir:
-                attr = curses.color_pair(2)
-                
-            display_text = prefix + item
-            if len(display_text) > width - 2:
-                display_text = display_text[:width-5] + "..."
-                
+            # Calculate visible range for reorder mode
+            max_items = height - 7  # Reserve lines for header, footer, status
+            if max_items < 1:
+                max_items = 1
+            
+            if self.current_index - self.scroll_offset >= max_items:
+                self.scroll_offset = self.current_index - max_items + 1
+            elif self.current_index < self.scroll_offset:
+                self.scroll_offset = self.current_index
+            
+            end_idx = min(len(contents), self.scroll_offset + max_items)
+            
+            # Show marked files in current order for reordering
+            for i in range(self.scroll_offset, end_idx):
+                filepath = contents[i]
+                if filepath in self.marked_files:
+                    filename = self.marked_files[filepath]
+                    visible_contents.append((i, filepath, filename))
+                    
+            # Display the reorder list
+            for idx, (i, filepath, item) in enumerate(visible_contents):
+                prefix = f"[{i+1}] "
+                attr = curses.color_pair(3) if i == self.current_index else curses.color_pair(1)
+                display_text = prefix + item
+                if len(display_text) > width - 2:
+                    display_text = display_text[:width-5] + "..."
+                    
+                try:
+                    stdscr.addstr(2 + idx, 0, display_text, attr)
+                except curses.error:
+                    # Catch potential out-of-bounds errors
+                    pass
+        else:
+            # Get directory contents (normal mode)
             try:
-                stdscr.addstr(2 + i, 0, display_text, attr)
-            except curses.error:
-                # Catch potential out-of-bounds errors
-                pass
+                contents = self.get_filtered_directory_contents()
+            except Exception as e:
+                self.status_message = f"Error: {str(e)}"
+                contents = []
+
+            # Adjust current_index if needed
+            if contents and self.current_index >= len(contents):
+                self.current_index = len(contents) - 1
+            
+            # Calculate visible range
+            max_items = height - 7  # Reserve lines for header, footer, status
+            if max_items < 1:
+                max_items = 1
+            
+            if self.current_index - self.scroll_offset >= max_items:
+                self.scroll_offset = self.current_index - max_items + 1
+            elif self.current_index < self.scroll_offset:
+                self.scroll_offset = self.current_index
+            
+            end_idx = min(len(contents), self.scroll_offset + max_items)
+            visible_contents = contents[self.scroll_offset:end_idx]
+            
+            # Display directory contents
+            for i, item in enumerate(visible_contents):
+                idx = i + self.scroll_offset
+                is_dir = os.path.isdir(os.path.join(self.current_path, item))
+                is_marked = os.path.abspath(os.path.join(self.current_path, item)) in self.marked_files
+                
+                prefix = ""
+                if is_marked:
+                    prefix = "[*] "
+                elif is_dir:
+                    prefix = "[d] "
+                else:
+                    prefix = "    "
+                
+                attr = 0
+                if idx == self.current_index:
+                    attr = curses.color_pair(3)
+                elif is_marked:
+                    attr = curses.color_pair(1)
+                elif is_dir:
+                    attr = curses.color_pair(2)
+                    
+                display_text = prefix + item
+                if len(display_text) > width - 2:
+                    display_text = display_text[:width-5] + "..."
+                    
+                try:
+                    stdscr.addstr(2 + i, 0, display_text, attr)
+                except curses.error:
+                    # Catch potential out-of-bounds errors
+                    pass
         
-        # Draw footer with marked files count
+        # Draw footer with marked files count or reorder instructions
         marked_count = len(self.marked_files)
-        footer_text = f" Marked: {marked_count} files "
+        if self.reorder_mode:
+            footer_text = f" Use u/d or arrow keys to move files up/down | ESC to exit reorder mode "
+        else:
+            footer_text = f" Marked: {marked_count} files "
+            
         if self.filter_mode:
             mode_text = "FILTER MODE"
+            stdscr.addstr(height - 4, 0, mode_text, curses.color_pair(4))
+        elif self.reorder_mode:
+            mode_text = "REORDER MODE"
             stdscr.addstr(height - 4, 0, mode_text, curses.color_pair(4))
         
         try:
@@ -128,7 +183,11 @@ class FileConcatenator:
             stdscr.addstr(height - 2, 0, footer_text)
             
             # Show help line
-            help_text = "Press ? for help | q:Quit m:Mark f:Filter Enter:Open/Navigate c:Concatenate"
+            if self.reorder_mode:
+                help_text = "u/k:Move Up | d/j:Move Down | ESC:Exit Reorder | q:Quit"
+            else:
+                help_text = "Press ? for help | q:Quit | m:Mark | r:Reorder | Enter:Open/Navigate | c:Concatenate"
+                
             if len(help_text) > width:
                 help_text = help_text[:width-4] + "..."
             stdscr.addstr(height - 1, 0, help_text)
@@ -149,7 +208,7 @@ class FileConcatenator:
     def draw_help(self, stdscr):
         """Display help overlay"""
         height, width = stdscr.getmaxyx()
-        help_height = 12
+        help_height = 15
         help_width = 60
         start_y = (height - help_height) // 2
         start_x = (width - help_width) // 2
@@ -172,6 +231,9 @@ class FileConcatenator:
             "o: Set custom output filename",
             "f: Toggle filter mode (filter by name)",
             "e: Toggle filter by extension mode",
+            "r: Toggle reorder mode (change concatenation order)",
+            "  - In reorder mode: u/d to move files up/down",
+            "  - ESC: Exit reorder mode",
             "c: Concatenate all marked files",
             "q: Quit application",
             "?: Toggle this help"
@@ -206,6 +268,25 @@ class FileConcatenator:
                     self.status_message = "Filtering by filename"
             elif 32 <= key <= 126:  # Printable characters
                 self.current_filter += chr(key)
+            return
+            
+        # Handle reorder mode separately
+        if self.reorder_mode:
+            if key == 27:  # ESC to exit reorder mode
+                self.reorder_mode = False
+                self.status_message = "Exited reorder mode"
+            elif key == ord('r'):  # Toggle reorder mode
+                self.toggle_reorder_mode()
+            elif key == ord('u') or key == ord('k'):  # Move file up
+                self.move_file_up()
+            elif key == ord('d') or key == ord('j'):  # Move file down
+                self.move_file_down()
+            elif key == curses.KEY_UP:  # Up arrow
+                self.move_file_up()
+            elif key == curses.KEY_DOWN:  # Down arrow
+                self.move_file_down()
+            elif key == ord('q'):  # Quit
+                self.quit_flag = True
             return
         
         # Regular navigation and commands
@@ -243,6 +324,8 @@ class FileConcatenator:
             self.concatenate_files()
         elif key == ord('o'):
             self.set_output_filename()
+        elif key == ord('r'):  # Toggle reorder mode
+            self.toggle_reorder_mode()
         elif key == ord('q'):
             self.quit_flag = True
         elif key == ord('?'):
@@ -382,9 +465,15 @@ class FileConcatenator:
         # Toggle mark status
         if full_path in self.marked_files:
             del self.marked_files[full_path]
+            # Remove from order list as well
+            if full_path in self.marked_files_order:
+                self.marked_files_order.remove(full_path)
             self.status_message = f"Unmarked: {selected}"
         else:
             self.marked_files[full_path] = selected
+            # Add to order list
+            if full_path not in self.marked_files_order:
+                self.marked_files_order.append(full_path)
             self.status_message = f"Marked: {selected}"
 
     def unmark_and_move_up(self):
@@ -460,15 +549,26 @@ class FileConcatenator:
         
         try:
             with open(output_file, 'w', encoding='utf-8') as outfile:
-                for filepath, filename in self.marked_files.items():
-                    outfile.write(f"\n{'='*80}\n")
-                    outfile.write(f"FILE: {filename}\n")
-                    outfile.write(f"{'='*80}\n\n")
-                    
-                    with open(filepath, 'r', encoding='utf-8', errors='ignore') as infile:
-                        outfile.write(infile.read())
-                    
-                    outfile.write("\n\n")
+                # Use the ordered list instead of the dictionary directly
+                # If a file is in marked_files but not in the order list, add it to the end
+                files_to_process = list(self.marked_files_order)
+                
+                # Add any marked files that aren't in the order list (should be rare)
+                for filepath in self.marked_files:
+                    if filepath not in files_to_process:
+                        files_to_process.append(filepath)
+                        
+                for filepath in files_to_process:
+                    if filepath in self.marked_files:  # Ensure it's still marked
+                        filename = self.marked_files[filepath]
+                        outfile.write(f"\n{'='*80}\n")
+                        outfile.write(f"FILE: {filename}\n")
+                        outfile.write(f"{'='*80}\n\n")
+                        
+                        with open(filepath, 'r', encoding='utf-8', errors='ignore') as infile:
+                            outfile.write(infile.read())
+                        
+                        outfile.write("\n\n")
                     
             self.status_message = f"Concatenated {len(self.marked_files)} files to {os.path.basename(output_file)}"
         except Exception as e:
@@ -565,6 +665,44 @@ class FileConcatenator:
             self.status_message = f"Output filename set to: {input_text}"
         else:
             self.status_message = "Output filename unchanged"
+
+    def toggle_reorder_mode(self):
+        """Toggle reorder mode for marked files"""
+        if not self.marked_files:
+            self.status_message = "No files marked to reorder"
+            return
+            
+        self.reorder_mode = not self.reorder_mode
+        if self.reorder_mode:
+            self.status_message = "REORDER MODE: Use j/k or arrow keys to select, u/d to move files up/down"
+        else:
+            self.status_message = "Exited reorder mode"
+            
+    def move_file_up(self):
+        """Move the currently selected file up in the concatenation order"""
+        if not self.reorder_mode or not self.marked_files_order:
+            return
+            
+        # Use current_index as index into the order list
+        if self.current_index > 0 and self.current_index < len(self.marked_files_order):
+            # Swap with the previous item
+            self.marked_files_order[self.current_index], self.marked_files_order[self.current_index-1] = \
+                self.marked_files_order[self.current_index-1], self.marked_files_order[self.current_index]
+            self.current_index -= 1
+            self.status_message = f"Moved {os.path.basename(self.marked_files_order[self.current_index])} up"
+    
+    def move_file_down(self):
+        """Move the currently selected file down in the concatenation order"""
+        if not self.reorder_mode or not self.marked_files_order:
+            return
+            
+        # Use current_index as index into the order list
+        if self.current_index < len(self.marked_files_order) - 1:
+            # Swap with the next item
+            self.marked_files_order[self.current_index], self.marked_files_order[self.current_index+1] = \
+                self.marked_files_order[self.current_index+1], self.marked_files_order[self.current_index]
+            self.current_index += 1
+            self.status_message = f"Moved {os.path.basename(self.marked_files_order[self.current_index])} down"
 
 def main():
     """Entry point for the application"""
