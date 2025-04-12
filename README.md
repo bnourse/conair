@@ -19,7 +19,7 @@ ConAir (CONcatenate And Interactive Reorder) is a terminal-based utility for eas
 - Python 3.6 or higher
 - Optional: `pyperclip` library for clipboard support
 
-### Basic Installation
+### Linux/macOS Installation
 
 1. Clone the repository:
    ```
@@ -42,18 +42,118 @@ ConAir (CONcatenate And Interactive Reorder) is a terminal-based utility for eas
    ln -s $(pwd)/conair.py /usr/local/bin/conair
    ```
 
+### Windows Installation
+
+#### 1. Install Python (if not already installed)
+
+1. Download the latest Python installer from [python.org](https://www.python.org/downloads/windows/)
+2. Run the installer
+   - Make sure to check "Add Python to PATH" during installation
+   - Click "Install Now" for a standard installation
+3. Verify the installation by opening Command Prompt and typing:
+   ```
+   python --version
+   ```
+
+#### 2. Get the ConAir Code
+
+**Option A: Clone using Git**
+
+1. Open Command Prompt
+2. Navigate to the directory where you want to install ConAir
+3. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/conair.git
+   cd conair
+   ```
+
+**Option B: Download ZIP file**
+
+1. Download the repository as a ZIP file
+2. Extract the ZIP file to your desired location
+3. Open Command Prompt and navigate to the extracted folder:
+   ```
+   cd path\to\extracted\conair
+   ```
+
+#### 3. Install Required Dependencies
+
+1. Install pyperclip for clipboard support (optional but recommended):
+   ```
+   pip install pyperclip
+   ```
+
+#### 4. Create a Batch File for Easy Access (Optional)
+
+To run ConAir from anywhere in your system, you can create a batch file:
+
+1. Create a new text file named `conair.bat` in a directory that's in your system PATH (e.g., `C:\Windows`)
+2. Add the following content to the file (replace the path with your actual installation path):
+   ```batch
+   @echo off
+   python C:\path\to\conair\conair.py %*
+   ```
+3. Save the file
+
+#### 5. Running ConAir on Windows
+
+**Method 1: Direct Python execution**
+
+1. Open Command Prompt
+2. Navigate to the ConAir directory:
+   ```
+   cd path\to\conair
+   ```
+3. Run the script:
+   ```
+   python conair.py
+   ```
+
+**Method 2: Using the batch file (if created)**
+
+1. Open Command Prompt
+2. Navigate to any directory you want to work in
+3. Simply type:
+   ```
+   conair
+   ```
+
+#### Windows Troubleshooting
+
+1. **Python not recognized as a command**
+   - Make sure Python is added to your PATH environment variable
+   - Try reinstalling Python with the "Add Python to PATH" option checked
+
+2. **Clipboard functionality not working**
+   - Ensure pyperclip is installed: `pip install pyperclip`
+   - If using Windows Terminal with elevated privileges, clipboard access may be restricted
+
+3. **Display issues in Windows Terminal**
+   - ConAir uses curses for its TUI; try using a different terminal emulator if you encounter display problems
+   - Adjust terminal window size if the interface appears corrupted
+
 ## Usage
 
 ### Basic Usage
 
 Run the script from the directory where you want to start:
 
+**Linux/macOS:**
 ```
 ./conair.py
 ```
 
 Or if you've created the symlink:
+```
+conair
+```
 
+**Windows:**
+```
+python conair.py
+```
+
+Or if you've created the batch file:
 ```
 conair
 ```
