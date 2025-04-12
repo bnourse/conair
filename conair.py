@@ -259,13 +259,7 @@ class FileConcatenator:
             elif key == 10 or key == curses.KEY_ENTER:  # Enter to apply filter
                 self.filter_mode = False
             elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:  # Backspace
-                self.current_filter = self.current_filter[:-1]
-            elif key == 9:  # Tab to toggle filter by extension
-                self.filter_by_extension = not self.filter_by_extension
-                if self.filter_by_extension:
-                    self.status_message = "Filtering by extension"
-                else:
-                    self.status_message = "Filtering by filename"
+                self.current_filter = self.current_filter[:-1]            # Tab toggle functionality removed
             elif 32 <= key <= 126:  # Printable characters
                 self.current_filter += chr(key)
             return
@@ -310,17 +304,13 @@ class FileConcatenator:
             # Auto-advance to next file after marking
             contents = self.get_filtered_directory_contents()
             if contents and self.current_index < len(contents) - 1:
-                self.current_index += 1
+                self.current_index += 1        
         elif key == ord('a'):
             self.mark_all_files()
-        elif key == ord('f'):
+        elif key == ord('/'):
             self.filter_mode = True
             self.filter_by_extension = False
             self.status_message = "Filter mode: Type to filter by filename"
-        elif key == ord('e'):
-            self.filter_mode = True
-            self.filter_by_extension = True
-            self.status_message = "Filter mode: Type to filter by extension"
         elif key == ord('c'):
             self.concatenate_files()
         elif key == ord('o'):

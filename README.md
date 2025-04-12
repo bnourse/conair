@@ -78,7 +78,12 @@ ConAir (CONcatenate And Interactive Reorder) is a terminal-based utility for eas
 
 #### 3. Install Required Dependencies
 
-1. Install pyperclip for clipboard support (optional but recommended):
+1. Install the windows-curses package (required for Windows):
+   ```
+   pip install windows-curses
+   ```
+
+2. Install pyperclip for clipboard support (optional but recommended):
    ```
    pip install pyperclip
    ```
@@ -174,7 +179,6 @@ conair
 
 - Press `/` to enter filter mode
 - Type part of a filename to filter the list
-- Press `.` to filter by file extension
 - Press `Escape` to exit filter mode
 
 ### Reordering
