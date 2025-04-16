@@ -226,7 +226,8 @@ class FileConcatenator:
             "Backspace: Go up one directory",
             "m: Mark/unmark file (auto-advances to next)",
             "u: Unmark file and move up in list",
-            "y: Copy file contents to clipboard",
+            "y: Copy concatenated content to clipboard",
+            "Y: Copy current file contents to clipboard",
             "p: Copy file path to clipboard",
             "a: Mark all text files in current directory",
             "o: Set custom output filename",
@@ -324,7 +325,9 @@ class FileConcatenator:
             self.help_visible = not self.help_visible
         elif key == ord('u'):  # Unmark and move up
             self.unmark_and_move_up()
-        elif key == ord('y'):  # Copy file contents to clipboard (like vim's "yank")
+        elif key == ord('y'):  # Copy concatenated content to clipboard
+            self.copy_concatenated_content_to_clipboard()
+        elif key == ord('Y'):  # Copy file contents to clipboard (like vim's "yank")
             self.copy_file_contents_to_clipboard()
         elif key == ord('p'):  # Copy file path to clipboard
             self.copy_file_path_to_clipboard()
@@ -620,6 +623,41 @@ class FileConcatenator:
         
         if self.copy_to_clipboard(full_path):
             self.status_message = f"Copied path of {selected} to clipboard"
+            
+    def copy_concatenated_content_to_clipboard(self):
+        """Copy the concatenated content of all marked files to clipboard"""
+        if not self.marked_files:
+            self.status_message = "No files marked for concatenation"
+            return
+            
+        try:
+            concatenated_content = ""
+            
+            # Use the ordered list for concatenation
+            files_to_process = list(self.marked_files_order)
+            
+            # Add any marked files that aren't in the order list (should be rare)
+            for filepath in self.marked_files:
+                if filepath not in files_to_process:
+                    files_to_process.append(filepath)
+                    
+            for filepath in files_to_process:
+                if filepath in self.marked_files:  # Ensure it's still marked
+                    filename = self.marked_files[filepath]
+                    concatenated_content += f"\n{'='*80}\n"
+                    concatenated_content += f"FILE: {filename}\n"
+                    concatenated_content += f"{'='*80}\n\n"
+                    
+                    with open(filepath, 'r', encoding='utf-8', errors='ignore') as infile:
+                        concatenated_content += infile.read()
+                    
+                    concatenated_content += "\n\n"
+                
+            if self.copy_to_clipboard(concatenated_content):
+                self.status_message = f"Copied concatenated content of {len(self.marked_files)} files to clipboard"
+            
+        except Exception as e:
+            self.status_message = f"Error copying concatenated content: {str(e)}"
 
     def set_output_filename(self):
         """Set a custom output filename"""
