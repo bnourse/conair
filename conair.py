@@ -28,6 +28,10 @@ class FileConcatenator:
         self.marked_files_order: List[str] = []  # List of absolute paths in concatenation order
         self.current_filter = ""
         self.filter_mode = False
+        self.search_mode = False
+        self.search_term = ""
+        self.search_results: List[int] = []  # Indices of items matching search
+        self.current_search_index = 0
         self.current_index = 0
         self.scroll_offset = 0
         self.status_message = ""
@@ -62,8 +66,16 @@ class FileConcatenator:
         else:
             header = f" Current Dir: {self.current_path} "
             
-        filter_status = f" Filter: {self.current_filter}" if self.filter_mode else ""
-        stdscr.addstr(0, 0, header + filter_status)
+        # Always show filter status if there's an active filter, not just in filter mode
+        filter_status = f" Filter: {self.current_filter}" if self.current_filter else ""
+        
+        # Show search status if search is active
+        search_status = f" Search: {self.search_term}" if self.search_term else ""
+        if self.search_term and self.search_results:
+            search_status += f" ({self.current_search_index + 1}/{len(self.search_results)})"
+            
+        status_text = filter_status + search_status
+        stdscr.addstr(0, 0, header + status_text)
         stdscr.addstr(1, 0, "=" * (width - 1))
         
         # If in reorder mode, show marked files in current order
@@ -195,6 +207,11 @@ class FileConcatenator:
             # Show status message if any
             if self.status_message:
                 stdscr.addstr(height - 5, 0, self.status_message, curses.color_pair(5))
+            
+            # Show search mode indicator
+            if self.search_mode:
+                search_prompt = f"/{self.search_term}"
+                stdscr.addstr(height - 5, 0, search_prompt, curses.color_pair(4))
         except curses.error:
             # Catch potential out-of-bounds errors
             pass
@@ -231,7 +248,9 @@ class FileConcatenator:
             "a: Mark all text files in current directory",
             "o: Set custom output filename",
             "f: Toggle filter mode (filter by name)",
-
+            "/: Enter search mode (search for files by name)",
+            "n: Go to next search result",
+            "N: Go to previous search result",
             "r: Toggle reorder mode (change concatenation order)",
             "  - In reorder mode: u/d to move files up/down",
             "  - ESC: Exit reorder mode",
@@ -264,6 +283,32 @@ class FileConcatenator:
             elif 32 <= key <= 126:  # Printable characters
                 self.current_filter += chr(key)
             return
+        # Search mode handling
+        elif self.search_mode:
+            if key == 27:  # ESC to exit search mode
+                self.search_mode = False
+                self.status_message = "Search canceled"
+            elif key == 10 or key == curses.KEY_ENTER:  # Enter to execute search
+                self.search_mode = False
+                self.execute_search()
+            elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:  # Backspace
+                self.search_term = self.search_term[:-1]
+            elif 32 <= key <= 126:  # Printable characters
+                self.search_term += chr(key)
+            return
+        # When not in filter or search mode but ESC is pressed
+        elif key == 27:
+            # Clear filter if active
+            if self.current_filter:
+                self.current_filter = ""
+                self.status_message = "Filter cleared"
+                return
+            # Clear search if active
+            elif self.search_term:
+                self.search_term = ""
+                self.search_results = []
+                self.status_message = "Search cleared"
+                return
             
         # Handle reorder mode separately
         if self.reorder_mode:
@@ -308,9 +353,17 @@ class FileConcatenator:
                 self.current_index += 1        
         elif key == ord('a'):
             self.mark_all_files()
-        elif key == ord('/'):
+        elif key == ord('f'):
             self.filter_mode = True
             self.status_message = "Filter mode: Type to filter by filename"
+        elif key == ord('/'):
+            self.search_mode = True
+            self.search_term = ""
+            self.status_message = "Search mode: Type to search for files"
+        elif key == ord('n'):
+            self.navigate_to_next_search_result()
+        elif key == ord('N'):
+            self.navigate_to_previous_search_result()
         elif key == ord('c'):
             self.concatenate_files()
         elif key == ord('o'):
@@ -687,6 +740,47 @@ class FileConcatenator:
         else:
             self.status_message = "Output filename unchanged"
 
+    def execute_search(self):
+        """Execute search based on current search term"""
+        if not self.search_term:
+            self.search_results = []
+            return
+            
+        contents = self.get_filtered_directory_contents()
+        self.search_results = []
+        
+        # Find all matching indices
+        for i, item in enumerate(contents):
+            if self.search_term.lower() in item.lower():
+                self.search_results.append(i)
+                
+        if self.search_results:
+            self.current_search_index = 0
+            self.current_index = self.search_results[0]
+            self.status_message = f"Found {len(self.search_results)} matches for '{self.search_term}'"
+        else:
+            self.status_message = f"No matches found for '{self.search_term}'"
+            
+    def navigate_to_next_search_result(self):
+        """Move to the next search result"""
+        if not self.search_results:
+            self.status_message = "No active search"
+            return
+            
+        self.current_search_index = (self.current_search_index + 1) % len(self.search_results)
+        self.current_index = self.search_results[self.current_search_index]
+        self.status_message = f"Match {self.current_search_index + 1} of {len(self.search_results)}"
+        
+    def navigate_to_previous_search_result(self):
+        """Move to the previous search result"""
+        if not self.search_results:
+            self.status_message = "No active search"
+            return
+            
+        self.current_search_index = (self.current_search_index - 1) % len(self.search_results)
+        self.current_index = self.search_results[self.current_search_index]
+        self.status_message = f"Match {self.current_search_index + 1} of {len(self.search_results)}"
+            
     def toggle_reorder_mode(self):
         """Toggle reorder mode for marked files"""
         if not self.marked_files:

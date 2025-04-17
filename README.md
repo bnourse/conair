@@ -186,9 +186,19 @@ conair /path/to/directory
 
 ### Filtering
 
-- Press `/` to enter filter mode
+- Press `f` to enter filter mode
 - Type part of a filename to filter the list
 - Press `Escape` or `Enter` to exit filter mode
+- When a filter is active, press `Escape` to clear the filter without entering filter mode
+
+### Searching (Vim-like)
+
+- Press `/` to enter search mode
+- Type the search term to look for in filenames
+- Press `Enter` to execute the search and jump to the first match
+- Press `n` to move to the next match
+- Press `N` to move to the previous match
+- Press `Escape` to clear the current search results
 
 ### Reordering
 
