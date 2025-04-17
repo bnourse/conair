@@ -7,7 +7,7 @@ ConAir (CONcatenate And Interactive Reorder) is a terminal-based utility for eas
 - Interactive TUI (Text User Interface) for navigating directories
 - Mark multiple files for concatenation
 - Reorder selected files before concatenation
-- Filter files by name or extension
+- Filter files by name
 - Copy concatenated text to clipboard
 - Custom output file naming
 - Intuitive keyboard shortcuts

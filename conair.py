@@ -28,7 +28,6 @@ class FileConcatenator:
         self.marked_files_order: List[str] = []  # List of absolute paths in concatenation order
         self.current_filter = ""
         self.filter_mode = False
-        self.filter_by_extension = False
         self.current_index = 0
         self.scroll_offset = 0
         self.status_message = ""
@@ -232,7 +231,7 @@ class FileConcatenator:
             "a: Mark all text files in current directory",
             "o: Set custom output filename",
             "f: Toggle filter mode (filter by name)",
-            "e: Toggle filter by extension mode",
+
             "r: Toggle reorder mode (change concatenation order)",
             "  - In reorder mode: u/d to move files up/down",
             "  - ESC: Exit reorder mode",
@@ -311,7 +310,6 @@ class FileConcatenator:
             self.mark_all_files()
         elif key == ord('/'):
             self.filter_mode = True
-            self.filter_by_extension = False
             self.status_message = "Filter mode: Type to filter by filename"
         elif key == ord('c'):
             self.concatenate_files()
@@ -350,16 +348,9 @@ class FileConcatenator:
             
             # Apply filter if needed
             if self.current_filter:
-                if self.filter_by_extension:
-                    # Filter by file extension
-                    filter_pattern = self.current_filter.lower()
-                    return [item for item in sorted_contents if 
-                           (os.path.isdir(os.path.join(self.current_path, item)) or
-                            os.path.splitext(item.lower())[1].endswith(filter_pattern))]
-                else:
-                    # Filter by filename
-                    filter_pattern = self.current_filter.lower()
-                    return [item for item in sorted_contents if filter_pattern in item.lower()]
+                # Filter by filename
+                filter_pattern = self.current_filter.lower()
+                return [item for item in sorted_contents if filter_pattern in item.lower()]
             
             return sorted_contents
         except Exception as e:
