@@ -41,6 +41,9 @@ class FileConcatenator:
         self.reorder_mode = False  # Flag for reorder mode
         self.column_count = 2  # Number of columns for file list
         self.page = 0  # Current page for pagination
+        self.quick_mark_mode = False  # Flag for quick-mark mode
+        self.quick_mark_files = []  # List of all text files for quick-mark mode
+        self.quick_mark_page = 0  # Current page in quick-mark mode
 
     def run(self, stdscr):
         """Main entry point for the curses application"""
@@ -63,7 +66,9 @@ class FileConcatenator:
         height, width = stdscr.getmaxyx()
         
         # Draw header
-        if self.reorder_mode:
+        if self.quick_mark_mode:
+            header = f" QUICK-MARK MODE - Press letters to mark/unmark files "
+        elif self.reorder_mode:
             header = f" REORDER MODE - Concatenation Order "
         else:
             header = f" Current Dir: {self.current_path} "
@@ -80,8 +85,11 @@ class FileConcatenator:
         stdscr.addstr(0, 0, header + status_text)
         stdscr.addstr(1, 0, "=" * (width - 1))
         
+        # If in quick-mark mode, show files with letter labels
+        if self.quick_mark_mode:
+            self.draw_quick_mark_mode(stdscr)
         # If in reorder mode, show marked files in current order (single column view)
-        if self.reorder_mode:
+        elif self.reorder_mode:
             visible_contents = []
             contents = self.marked_files_order
             
@@ -283,6 +291,7 @@ class FileConcatenator:
             "g: Go to top | G: Go to bottom",
             "]/PgDn: Next page | [/PgUp: Previous page",
             "m: Mark/unmark file (auto-advances to next)",
+            "Q: Toggle quick-mark mode (letter shortcuts for marking)",
             "u: Unmark file and move up in list",
             "y: Copy concatenated content to clipboard",
             "Y: Copy current file contents to clipboard",
@@ -338,7 +347,26 @@ class FileConcatenator:
             elif 32 <= key <= 126:  # Printable characters
                 self.search_term += chr(key)
             return
-        # When not in filter or search mode but ESC is pressed
+        # Quick-mark mode handling
+        elif self.quick_mark_mode:
+            if key == 27:  # ESC to exit quick-mark mode
+                self.quick_mark_mode = False
+                self.status_message = "Exited quick-mark mode"
+                return
+            elif 97 <= key <= 122:  # lowercase a-z (97-122)
+                self.toggle_quick_mark_by_letter(chr(key))
+                return
+            elif 65 <= key <= 90:  # uppercase A-Z (65-90)
+                self.toggle_quick_mark_by_letter(chr(key))
+                return
+            elif key == ord(']') or key == curses.KEY_NPAGE:  # Next page
+                self.next_quick_mark_page()
+                return
+            elif key == ord('[') or key == curses.KEY_PPAGE:  # Previous page
+                self.prev_quick_mark_page()
+                return
+            return  # Ignore other keys in quick-mark mode
+        # When not in filter, search, or quick-mark mode but ESC is pressed
         elif key == 27:
             # Clear filter if active
             if self.current_filter:
@@ -432,6 +460,8 @@ class FileConcatenator:
             self.navigate_to_next_search_result()
         elif key == ord('N'):
             self.navigate_to_previous_search_result()
+        elif key == ord('Q'):  # Capital Q for quick-mark mode
+            self.toggle_quick_mark_mode()
         elif key == ord('c'):
             self.concatenate_files()
         elif key == ord('o'):
@@ -912,6 +942,176 @@ class FileConcatenator:
             # Update current_index to the first item on the new page
             self.current_index = self.page * items_per_page
             self.status_message = f"Page {self.page + 1}/{total_pages}"
+            
+    def toggle_quick_mark_mode(self):
+        """Toggle quick-mark mode for rapid file marking"""
+        if self.reorder_mode:
+            self.status_message = "Exit reorder mode first"
+            return
+            
+        # Toggle mode
+        self.quick_mark_mode = not self.quick_mark_mode
+        
+        if self.quick_mark_mode:
+            # Prepare the quick-mark file list (all text files)
+            contents = self.get_filtered_directory_contents()
+            self.quick_mark_files = []
+            for item in contents:
+                if not os.path.isdir(os.path.join(self.current_path, item)):
+                    if self.is_text_file(os.path.join(self.current_path, item)):
+                        self.quick_mark_files.append(item)
+            
+            # Reset to first page
+            self.quick_mark_page = 0
+            
+            if not self.quick_mark_files:
+                self.quick_mark_mode = False
+                self.status_message = "No text files to mark"
+            else:
+                total_pages = (len(self.quick_mark_files) + 51) // 52  # Ceiling division for total pages
+                if total_pages > 1:
+                    self.status_message = f"QUICK-MARK MODE: Page 1/{total_pages} - [/] to navigate, ESC to exit"
+                else:
+                    self.status_message = "QUICK-MARK MODE: Press letters to mark/unmark files, ESC to exit"
+        else:
+            self.status_message = "Exited quick-mark mode"
+            
+    def draw_quick_mark_mode(self, stdscr):
+        """Draw the quick-mark mode interface"""
+        height, width = stdscr.getmaxyx()
+        
+        # Calculate layout
+        max_filename_width = width - 10  # Allow for label and padding
+        
+        # Calculate pagination
+        files_per_page = 52  # a-z + A-Z
+        total_files = len(self.quick_mark_files)
+        total_pages = (total_files + files_per_page - 1) // files_per_page  # Ceiling division
+        
+        # Show page indicator if multiple pages
+        if total_pages > 1:
+            page_indicator = f" Page {self.quick_mark_page + 1}/{total_pages} - '[' prev, ']' next "
+            try:
+                stdscr.addstr(height - 6, 0, page_indicator)
+            except curses.error:
+                pass
+        
+        # Calculate start and end indices for current page
+        start_idx = self.quick_mark_page * files_per_page
+        end_idx = min(total_files, start_idx + files_per_page)
+        page_files = self.quick_mark_files[start_idx:end_idx]
+        
+        # First, draw lowercase letters (a-z)
+        lower_count = min(26, len(page_files))
+        for i in range(lower_count):
+            letter = chr(97 + i)  # 'a' starts at 97
+            filename = page_files[i]
+            full_path = os.path.abspath(os.path.join(self.current_path, filename))
+            is_marked = full_path in self.marked_files
+            
+            # Truncate filename if needed
+            if len(filename) > max_filename_width:
+                display_name = filename[:max_filename_width-3] + "..."
+            else:
+                display_name = filename
+                
+            # Prepare the display line
+            if is_marked:
+                label = f"[{letter}*]"
+                attr = curses.color_pair(1)  # Marked color
+            else:
+                label = f"[{letter} ]"
+                attr = 0  # Normal color
+                
+            # Display the line
+            try:
+                row = 2 + i
+                if row < height - 6:  # Ensure we don't go off-screen
+                    stdscr.addstr(row, 0, f"{label} {display_name}", attr)
+            except curses.error:
+                pass
+                
+        # Then, draw uppercase letters (A-Z) if we have more files
+        upper_count = min(26, len(page_files) - 26)
+        for i in range(upper_count):
+            letter = chr(65 + i)  # 'A' starts at 65
+            filename = page_files[26 + i]
+            full_path = os.path.abspath(os.path.join(self.current_path, filename))
+            is_marked = full_path in self.marked_files
+            
+            # Truncate filename if needed
+            if len(filename) > max_filename_width:
+                display_name = filename[:max_filename_width-3] + "..."
+            else:
+                display_name = filename
+                
+            # Prepare the display line
+            if is_marked:
+                label = f"[{letter}*]"
+                attr = curses.color_pair(1)  # Marked color
+            else:
+                label = f"[{letter} ]"
+                attr = 0  # Normal color
+                
+            # Display the line
+            try:
+                row = 2 + lower_count + i
+                if row < height - 6:  # Ensure we don't go off-screen
+                    stdscr.addstr(row, 0, f"{label} {display_name}", attr)
+            except curses.error:
+                pass
+                
+    def toggle_quick_mark_by_letter(self, letter):
+        """Toggle mark status for a file in quick-mark mode based on its letter"""
+        letter_index = -1
+        
+        # Calculate index based on letter
+        if 'a' <= letter <= 'z':
+            letter_index = ord(letter) - 97  # 'a' is 0
+        elif 'A' <= letter <= 'Z':
+            letter_index = ord(letter) - 65 + 26  # 'A' is 26
+            
+        # Calculate actual index in the full list, accounting for pagination
+        files_per_page = 52
+        start_idx = self.quick_mark_page * files_per_page
+        actual_index = start_idx + letter_index
+            
+        # Check if file exists at this index
+        if 0 <= letter_index < 52 and actual_index < len(self.quick_mark_files):
+            filename = self.quick_mark_files[actual_index]
+            full_path = os.path.abspath(os.path.join(self.current_path, filename))
+            
+            # Toggle mark status
+            if full_path in self.marked_files:
+                del self.marked_files[full_path]
+                # Remove from order list as well
+                if full_path in self.marked_files_order:
+                    self.marked_files_order.remove(full_path)
+                self.status_message = f"Unmarked: {filename}"
+            else:
+                self.marked_files[full_path] = filename
+                # Add to order list
+                if full_path not in self.marked_files_order:
+                    self.marked_files_order.append(full_path)
+                self.status_message = f"Marked: {filename}"
+                
+    def next_quick_mark_page(self):
+        """Move to the next page in quick-mark mode"""
+        files_per_page = 52
+        total_pages = (len(self.quick_mark_files) + files_per_page - 1) // files_per_page
+        
+        if self.quick_mark_page < total_pages - 1:
+            self.quick_mark_page += 1
+            self.status_message = f"Page {self.quick_mark_page + 1}/{total_pages}"
+        
+    def prev_quick_mark_page(self):
+        """Move to the previous page in quick-mark mode"""
+        files_per_page = 52
+        total_pages = (len(self.quick_mark_files) + files_per_page - 1) // files_per_page
+        
+        if self.quick_mark_page > 0:
+            self.quick_mark_page -= 1
+            self.status_message = f"Page {self.quick_mark_page + 1}/{total_pages}"
             
     def update_page_for_current_index(self, stdscr):
         """Update the page based on the current index"""

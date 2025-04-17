@@ -187,6 +187,16 @@ conair /path/to/directory
   - Otherwise, it will mark all unmarked text files
 - Press `u` to unmark the currently selected file and move up in the list
 
+### Quick-Mark Mode
+
+- Press `Q` to enter quick-mark mode
+- In this mode, files are shown with letter labels (a-z, A-Z)
+- Press the corresponding letter to mark/unmark a file
+- For directories with more than 52 files:
+  - Press `]` or Page Down to view the next page of files
+  - Press `[` or Page Up to view the previous page of files
+- Press `Escape` to exit quick-mark mode
+
 ### Filtering
 
 - Press `f` to enter filter mode
