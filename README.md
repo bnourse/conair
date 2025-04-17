@@ -170,11 +170,14 @@ conair /path/to/directory
 
 ### Navigation
 
-- Use arrow keys (or `j`/`k`) to navigate up and down
+- Use up/down arrow keys (or `j`/`k`) to navigate up and down
+- Use left/right arrow keys (or `h`/`l`) to navigate between columns
 - Press `Enter` to enter a directory or preview a file
 - Press `Backspace` to go up a directory
 - Press `g` to jump to the top of the file list
 - Press `G` to jump to the bottom of the file list
+- Press `]` or Page Down to go to the next page
+- Press `[` or Page Up to go to the previous page
 
 ### File Selection
 

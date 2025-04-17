@@ -39,6 +39,8 @@ class FileConcatenator:
         self.quit_flag = False
         self.custom_output_filename = ""  # Store custom output filename
         self.reorder_mode = False  # Flag for reorder mode
+        self.column_count = 2  # Number of columns for file list
+        self.page = 0  # Current page for pagination
 
     def run(self, stdscr):
         """Main entry point for the curses application"""
@@ -78,7 +80,7 @@ class FileConcatenator:
         stdscr.addstr(0, 0, header + status_text)
         stdscr.addstr(1, 0, "=" * (width - 1))
         
-        # If in reorder mode, show marked files in current order
+        # If in reorder mode, show marked files in current order (single column view)
         if self.reorder_mode:
             visible_contents = []
             contents = self.marked_files_order
@@ -131,50 +133,87 @@ class FileConcatenator:
             if contents and self.current_index >= len(contents):
                 self.current_index = len(contents) - 1
             
-            # Calculate visible range
-            max_items = height - 7  # Reserve lines for header, footer, status
-            if max_items < 1:
-                max_items = 1
-            
-            if self.current_index - self.scroll_offset >= max_items:
-                self.scroll_offset = self.current_index - max_items + 1
-            elif self.current_index < self.scroll_offset:
-                self.scroll_offset = self.current_index
-            
-            end_idx = min(len(contents), self.scroll_offset + max_items)
-            visible_contents = contents[self.scroll_offset:end_idx]
-            
-            # Display directory contents
-            for i, item in enumerate(visible_contents):
-                idx = i + self.scroll_offset
-                is_dir = os.path.isdir(os.path.join(self.current_path, item))
-                is_marked = os.path.abspath(os.path.join(self.current_path, item)) in self.marked_files
+            # Multi-column layout calculations
+            total_items = len(contents)
+            if total_items == 0:
+                # No items to display
+                stdscr.addstr(3, 0, "  (No files or directories)")
+            else:
+                # Calculate column width based on terminal width
+                available_width = width - 2  # Leave margin
+                col_padding = 2  # Space between columns
                 
-                prefix = ""
-                if is_marked:
-                    prefix = "[*] "
-                elif is_dir:
-                    prefix = "[d] "
-                else:
-                    prefix = "    "
+                # Dynamically adjust column count based on terminal width
+                # Make sure we have at least one column
+                self.column_count = max(1, min(4, available_width // 30))  # Limit to max 4 columns
                 
-                attr = 0
-                if idx == self.current_index:
-                    attr = curses.color_pair(3)
-                elif is_marked:
-                    attr = curses.color_pair(1)
-                elif is_dir:
-                    attr = curses.color_pair(2)
+                col_width = available_width // self.column_count - col_padding
+                
+                # Calculate items per page
+                items_per_column = height - 7  # Reserve lines for header, footer, status
+                if items_per_column < 1:
+                    items_per_column = 1
                     
-                display_text = prefix + item
-                if len(display_text) > width - 2:
-                    display_text = display_text[:width-5] + "..."
-                    
+                items_per_page = items_per_column * self.column_count
+                
+                # Calculate total pages
+                total_pages = (total_items + items_per_page - 1) // items_per_page
+                
+                # Make sure current_index is on the current page
+                page_of_current = self.current_index // items_per_page
+                if self.page != page_of_current:
+                    self.page = page_of_current
+                
+                # Calculate start and end indices for current page
+                start_idx = self.page * items_per_page
+                end_idx = min(total_items, start_idx + items_per_page)
+                
+                # Display page indicator
+                page_indicator = f" Page {self.page + 1}/{total_pages} "
                 try:
-                    stdscr.addstr(2 + i, 0, display_text, attr)
+                    stdscr.addstr(height - 6, 0, page_indicator)
                 except curses.error:
-                    # Catch potential out-of-bounds errors
                     pass
+                
+                # Display directory contents in columns
+                for i in range(start_idx, end_idx):
+                    item = contents[i]
+                    is_dir = os.path.isdir(os.path.join(self.current_path, item))
+                    is_marked = os.path.abspath(os.path.join(self.current_path, item)) in self.marked_files
+                    
+                    # Calculate column and row position
+                    relative_idx = i - start_idx
+                    col = relative_idx // items_per_column
+                    row = relative_idx % items_per_column
+                    
+                    # Calculate horizontal position
+                    x_pos = col * (col_width + col_padding)
+                    
+                    prefix = ""
+                    if is_marked:
+                        prefix = "[*] "
+                    elif is_dir:
+                        prefix = "[d] "
+                    else:
+                        prefix = "    "
+                    
+                    attr = 0
+                    if i == self.current_index:
+                        attr = curses.color_pair(3)
+                    elif is_marked:
+                        attr = curses.color_pair(1)
+                    elif is_dir:
+                        attr = curses.color_pair(2)
+                        
+                    display_text = prefix + item
+                    if len(display_text) > col_width:
+                        display_text = display_text[:col_width-3] + "..."
+                        
+                    try:
+                        stdscr.addstr(2 + row, x_pos, display_text, attr)
+                    except curses.error:
+                        # Catch potential out-of-bounds errors
+                        pass
         
         # Draw footer with marked files count or reorder instructions
         marked_count = len(self.marked_files)
@@ -238,8 +277,11 @@ class FileConcatenator:
             "FILE CONCATENATOR HELP",
             "=============================================",
             "↑/↓/j/k: Navigate up and down",
+            "←/→/h/l: Navigate left and right (multi-column)",
             "Enter: Open directory or view file",
             "Backspace: Go up one directory",
+            "g: Go to top | G: Go to bottom",
+            "]/PgDn: Next page | [/PgUp: Previous page",
             "m: Mark/unmark file (auto-advances to next)",
             "u: Unmark file and move up in list",
             "y: Copy concatenated content to clipboard",
@@ -333,14 +375,40 @@ class FileConcatenator:
         # Regular navigation and commands
         if key == curses.KEY_UP or key == ord('k'):
             self.current_index = max(0, self.current_index - 1)
+            self.update_page_for_current_index(stdscr)
         elif key == curses.KEY_DOWN or key == ord('j'):
             contents = self.get_filtered_directory_contents()
             self.current_index = min(len(contents) - 1 if contents else 0, self.current_index + 1)
+            self.update_page_for_current_index(stdscr)
+        elif key == curses.KEY_LEFT or key == ord('h'):
+            # Move left in multi-column view
+            items_per_column = self.get_items_per_column(stdscr)
+            if items_per_column > 0 and self.current_index >= items_per_column:
+                self.current_index -= items_per_column
+                self.update_page_for_current_index(stdscr)
+        elif key == curses.KEY_RIGHT or key == ord('l'):
+            # Move right in multi-column view
+            contents = self.get_filtered_directory_contents()
+            items_per_column = self.get_items_per_column(stdscr)
+            if items_per_column > 0 and self.current_index + items_per_column < len(contents):
+                self.current_index += items_per_column
+                self.update_page_for_current_index(stdscr)
         elif key == ord('g'):  # Go to top
             self.current_index = 0
+            self.page = 0
         elif key == ord('G'):  # Go to bottom
             contents = self.get_filtered_directory_contents()
             self.current_index = len(contents) - 1 if contents else 0
+            
+            # Update page for the bottom item
+            items_per_page = self.get_items_per_page(stdscr)
+            if items_per_page > 0:
+                self.page = self.current_index // items_per_page
+                
+        elif key == curses.KEY_NPAGE or key == ord(']'):  # Page Down
+            self.next_page(stdscr)
+        elif key == curses.KEY_PPAGE or key == ord('['):  # Page Up
+            self.prev_page(stdscr)
         elif key == 10 or key == curses.KEY_ENTER:  # Enter
             self.open_selected_item()
         elif key == curses.KEY_BACKSPACE or key == 127 or key == 8:  # Backspace
@@ -806,6 +874,53 @@ class FileConcatenator:
             self.current_index -= 1
             self.status_message = f"Moved {os.path.basename(self.marked_files_order[self.current_index])} up"
     
+    def get_items_per_column(self, stdscr):
+        """Calculate how many items fit in one column"""
+        height, _ = stdscr.getmaxyx()
+        return max(1, height - 7)  # Reserve lines for header, footer, status
+        
+    def get_items_per_page(self, stdscr):
+        """Calculate how many items fit on one page"""
+        return self.get_items_per_column(stdscr) * self.column_count
+        
+    def next_page(self, stdscr):
+        """Move to the next page"""
+        contents = self.get_filtered_directory_contents()
+        if not contents:
+            return
+            
+        items_per_page = self.get_items_per_page(stdscr)
+        total_pages = (len(contents) + items_per_page - 1) // items_per_page
+        
+        if self.page < total_pages - 1:
+            self.page += 1
+            # Update current_index to the first item on the new page
+            self.current_index = min(self.page * items_per_page, len(contents) - 1)
+            self.status_message = f"Page {self.page + 1}/{total_pages}"
+        
+    def prev_page(self, stdscr):
+        """Move to the previous page"""
+        contents = self.get_filtered_directory_contents()
+        if not contents:
+            return
+            
+        items_per_page = self.get_items_per_page(stdscr)
+        total_pages = (len(contents) + items_per_page - 1) // items_per_page
+        
+        if self.page > 0:
+            self.page -= 1
+            # Update current_index to the first item on the new page
+            self.current_index = self.page * items_per_page
+            self.status_message = f"Page {self.page + 1}/{total_pages}"
+            
+    def update_page_for_current_index(self, stdscr):
+        """Update the page based on the current index"""
+        items_per_page = self.get_items_per_page(stdscr)
+        if items_per_page > 0:
+            new_page = self.current_index // items_per_page
+            if new_page != self.page:
+                self.page = new_page
+                
     def move_file_down(self):
         """Move the currently selected file down in the concatenation order"""
         if not self.reorder_mode or not self.marked_files_order:
