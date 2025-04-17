@@ -23,7 +23,7 @@ ConAir (CONcatenate And Interactive Reorder) is a terminal-based utility for eas
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/conair.git
+   git clone https://github.com/bnourse/conair.git
    cd conair
    ```
 
@@ -63,7 +63,7 @@ ConAir (CONcatenate And Interactive Reorder) is a terminal-based utility for eas
 2. Navigate to the directory where you want to install ConAir
 3. Clone the repository:
    ```
-   git clone https://github.com/yourusername/conair.git
+   git clone https://github.com/bnourse/conair.git
    cd conair
    ```
 
@@ -163,36 +163,48 @@ Or if you've created the batch file:
 conair
 ```
 
+Specify a starting directory as a command-line argument:
+```
+conair /path/to/directory
+```
+
 ### Navigation
 
 - Use arrow keys (or `j`/`k`) to navigate up and down
-- Press `Enter` to enter a directory
-- Press `Backspace` or left arrow to go up a directory
+- Press `Enter` to enter a directory or preview a file
+- Press `Backspace` to go up a directory
+- Press `g` to jump to the top of the file list
+- Press `G` to jump to the bottom of the file list
 
 ### File Selection
 
-- Press `m` to mark/unmark a file for concatenation
-- Press `a` to mark all files in the current directory
-- Press `u` to unmark all files
+- Press `m` to mark/unmark a file for concatenation (cursor auto-advances to next file)
+- Press `a` to toggle marking all text files in the current directory
+  - If all files are already marked, this will unmark them all
+  - Otherwise, it will mark all unmarked text files
+- Press `u` to unmark the currently selected file and move up in the list
 
 ### Filtering
 
 - Press `/` to enter filter mode
 - Type part of a filename to filter the list
-- Press `Escape` to exit filter mode
+- Press `Escape` or `Enter` to exit filter mode
 
 ### Reordering
 
 - Press `r` to enter reorder mode
-- Use arrow keys to select files
-- Press `j`/`k` or up/down arrows to move files up or down in the concatenation order
+- Use arrow keys (or `j`/`k`) to select files
+- Press `u`/`d` to move files up or down in the concatenation order
 - Press `Escape` to exit reorder mode
 
 ### Concatenation
 
 - Press `c` to concatenate marked files
+  - If no custom filename is set, files are concatenated to "concatenated_YYYYMMDD_HHMMSS.txt"
 - Press `o` to specify a custom output filename
 - Press `y` to copy the concatenated content to clipboard
+- Press `Y` to copy the current file's contents to clipboard
+- Press `p` to copy the current file's path to clipboard
 
 ### Other Commands
 
@@ -215,10 +227,24 @@ conair
 3. Mark relevant files with `m`
 4. Press `y` to concatenate and copy to clipboard
 
+### Creating a combined log file
+
+1. Navigate to your logs directory
+2. Mark the log files you want to analyze together
+3. Use `r` to arrange them in chronological order if needed
+4. Press `c` to concatenate and specify an output file
+
+### Sharing multiple file contents
+
+1. Navigate to the relevant directory
+2. Mark all the files you want to share with `m`
+3. Press `y` to copy all contents to clipboard
+4. Paste into your document or communication tool
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request at https://github.com/bnourse/conair.
